@@ -66,7 +66,7 @@ func main() {
 	csvwriter := csv.NewWriter(csvFile)
 	csvwriter.Comma = '\t'
 
-	if err := csvwriter.Write([]string{"Название", "Цена за ед", "Сумма", "Количество"}); err != nil {
+	if err := csvwriter.Write([]string{"Название", "Цена за ед", "Количество", "Сумма"}); err != nil {
 		log.Fatalf("Ошибка записи в csb writer")
 	}
 
@@ -78,13 +78,13 @@ func main() {
 		price = strings.Replace(price, ".", ",", -1)
 		stringWriter = append(stringWriter, price)
 
-		sum := fmt.Sprintf("%.2f", item.Sum/100)
-		sum = strings.Replace(sum, ".", ",", -1)
-		stringWriter = append(stringWriter, sum)
-
 		quant := fmt.Sprintf("%.2f", item.Quantity)
 		quant = strings.Replace(quant, ".", ",", -1)
 		stringWriter = append(stringWriter, quant)
+
+		sum := fmt.Sprintf("%.2f", item.Sum/100)
+		sum = strings.Replace(sum, ".", ",", -1)
+		stringWriter = append(stringWriter, sum)
 
 		if err := csvwriter.Write(stringWriter); err != nil {
 			log.Fatalf("Ошибка записи в csb writer")
