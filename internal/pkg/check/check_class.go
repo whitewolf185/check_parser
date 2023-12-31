@@ -3,27 +3,18 @@ package check
 import (
 	"encoding/csv"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io/ioutil"
-	"log"
 	"os"
 	"path/filepath"
 	"runtime"
 	"strings"
 	"time"
+
+	log "github.com/sirupsen/logrus"
+
+	"github.com/whitewolf185/check_parser/internal/pkg/domain"
 )
-
-type Item struct {
-	Name     string  `json:"name"`
-	Price    float32 `json:"price"`
-	Sum      float32 `json:"sum"`
-	Quantity float32 `json:"quantity"`
-}
-
-type Items struct {
-	Items []Item `json:"items"`
-}
 
 type Parser struct {
 	Separator rune
@@ -34,12 +25,12 @@ type Parser struct {
 func MakeParser() *Parser {
 	var result Parser
 	_, b, _, _ := runtime.Caller(0)
-	Root := filepath.ToSlash(filepath.Join(filepath.Dir(b), "../.."))
+	Root := filepath.ToSlash(filepath.Join(filepath.Dir(b), "../../.."))
 	log.Printf("Root now is %s", Root)
 
 	result.Separator = '\t'
-	result.ResFold = Root + "/cmd/results/"
-	result.JsonFold = Root + "/cmd/JSONs/"
+	result.ResFold = Root + "/doc/results/"
+	result.JsonFold = Root + "/doc/JSONs/"
 	return &result
 }
 
@@ -51,19 +42,28 @@ func (obj *Parser) getTimeStamp() string {
 	return result
 }
 
-func (obj *Parser) GetScv(fileName string) error {
-	var items Items
+func (obj *Parser) GetCSV(fileName string) error {
+	var receipt domain.FullReceipt
 	file, err := ioutil.ReadFile(obj.JsonFold + fileName)
 	if err != nil {
-		newErr := fmt.Sprintf("File read err. Error : %s", err.Error())
-		return errors.New(newErr)
+		return fmt.Errorf("File read err: %w", err)
 	}
-	err = json.Unmarshal(file, &items)
+	err = json.Unmarshal(file, &receipt)
 	if err != nil {
-		return errors.New(fmt.Sprintf("Ошибка unmarchal. Error: %s", err.Error()))
+		return fmt.Errorf("Ошибка unmarchal: %w", err)
 	}
 
-	result := make(map[string]Item)
+	if len(receipt) >= 2 {
+		log.Warnf("receipt has len %d", len(receipt))
+	}
+
+	result := obj.countDoubles(receipt[0].Ticket.Document.Receipt.Items)
+
+	return obj.writeToCSV(result)
+}
+
+func (obj *Parser) countDoubles(items domain.Items) map[string]domain.Item {
+	result := make(map[string]domain.Item)
 
 	for _, item := range items.Items {
 		res, ok := result[item.Name]
@@ -76,9 +76,14 @@ func (obj *Parser) GetScv(fileName string) error {
 		}
 	}
 
+	return result
+}
+
+func (obj *Parser) writeToCSV(items map[string]domain.Item) error {
+	// TODO вставлять время из чека
 	csvFile, err := os.Create(obj.ResFold + obj.getTimeStamp() + ".csv")
 	if err != nil {
-		return errors.New(fmt.Sprintf("Failed creating file: %e", err))
+		return fmt.Errorf("Failed creating file: %w", err)
 	}
 	defer func() {
 		err := csvFile.Close()
@@ -91,10 +96,10 @@ func (obj *Parser) GetScv(fileName string) error {
 	csvwriter.Comma = obj.Separator
 
 	if err := csvwriter.Write([]string{"Название", "Цена за ед", "Количество", "Сумма"}); err != nil {
-		return errors.New(fmt.Sprintf("Ошибка записи в csb writer"))
+		return fmt.Errorf("Ошибка записи в csv writer: %w", err)
 	}
 
-	for _, item := range result {
+	for _, item := range items {
 		var stringWriter []string
 		stringWriter = append(stringWriter, item.Name)
 
@@ -111,7 +116,7 @@ func (obj *Parser) GetScv(fileName string) error {
 		stringWriter = append(stringWriter, sum)
 
 		if err := csvwriter.Write(stringWriter); err != nil {
-			return errors.New(fmt.Sprintf("Ошибка записи в csb writer"))
+			return fmt.Errorf("Ошибка записи в csv writer при записи данных: %w", err)
 		}
 	}
 	csvwriter.Flush()

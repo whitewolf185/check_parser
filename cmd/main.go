@@ -3,9 +3,9 @@ package main
 import (
 	"fmt"
 
-	"github.com/whitewolf185/check_parser/pkg/check"
-
 	log "github.com/sirupsen/logrus"
+
+	"github.com/whitewolf185/check_parser/internal/pkg/check"
 )
 
 func main() {
@@ -18,7 +18,7 @@ func main() {
 		panic(err)
 	}
 
-	if err := parser.GetScv(fileName); err != nil {
+	if err := parser.GetCSV(fileName); err != nil {
 		log.Fatal(err)
 	}
 }
